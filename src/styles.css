@@ -1,0 +1,340 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * DripCheck design system — premium fashion-editorial aesthetic.
+ * Warm ivory canvas, charcoal type, one restrained clay accent,
+ * thin hairline rules and generous whitespace.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 10px);
+  --radius-3xl: calc(var(--radius) + 16px);
+  --radius-4xl: calc(var(--radius) + 22px);
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-editorial: "Instrument Serif", ui-serif, Georgia, serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ink: var(--ink);
+  --color-sand: var(--sand);
+}
+
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.977 0.007 86);
+  --foreground: oklch(0.21 0.008 60);
+  --ink: oklch(0.16 0.006 60);
+  --sand: oklch(0.943 0.012 85);
+  --card: oklch(0.995 0.003 86);
+  --card-foreground: oklch(0.21 0.008 60);
+  --popover: oklch(0.995 0.003 86);
+  --popover-foreground: oklch(0.21 0.008 60);
+  --primary: oklch(0.21 0.008 60);
+  --primary-foreground: oklch(0.98 0.005 86);
+  --secondary: oklch(0.943 0.012 85);
+  --secondary-foreground: oklch(0.21 0.008 60);
+  --muted: oklch(0.935 0.011 85);
+  --muted-foreground: oklch(0.5 0.012 70);
+  --accent: oklch(0.56 0.142 40);
+  --accent-2: oklch(0.62 0.12 44);
+  --accent-foreground: oklch(0.985 0.004 86);
+  --drip-ink: oklch(0.985 0.004 86);
+  --destructive: oklch(0.52 0.19 27);
+  --destructive-foreground: oklch(0.985 0.004 86);
+  --border: oklch(0.21 0.008 60 / 13%);
+  --input: oklch(0.21 0.008 60 / 18%);
+  --ring: oklch(0.56 0.142 40 / 35%);
+  --gradient-drip: linear-gradient(135deg, var(--accent), var(--accent-2));
+  --glow-accent: 0 10px 26px -14px oklch(0.56 0.142 40 / 55%);
+}
+
+.dark {
+  color-scheme: light;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: var(--accent);
+    color: var(--accent-foreground);
+  }
+}
+
+@utility font-display {
+  font-family: var(--font-display);
+}
+
+@utility font-editorial {
+  font-family: var(--font-editorial);
+  font-weight: 400;
+  letter-spacing: -0.015em;
+}
+
+@utility drip-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  transition:
+    transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.35s ease,
+    box-shadow 0.35s ease;
+
+  &:hover {
+    box-shadow: 0 18px 40px -30px oklch(0.21 0.008 60 / 45%);
+  }
+}
+
+@utility drip-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: color-mix(in oklab, var(--card) 88%, transparent);
+  padding: 0.3rem 0.75rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
+
+@utility drip-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  font-weight: 600;
+  padding: 0.75rem 1.4rem;
+  font-size: 0.9rem;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    background 0.25s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--glow-accent);
+    background: color-mix(in oklab, var(--accent) 90%, black);
+  }
+}
+
+@utility drip-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--foreground) 22%, transparent);
+  background: transparent;
+  color: var(--foreground);
+  font-weight: 600;
+  padding: 0.75rem 1.4rem;
+  font-size: 0.9rem;
+  transition:
+    transform 0.25s ease,
+    border-color 0.25s ease,
+    background 0.25s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    border-color: var(--foreground);
+    background: color-mix(in oklab, var(--foreground) 5%, transparent);
+  }
+}
+
+@utility drip-category {
+  position: relative;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  padding: 0.6rem 1.1rem;
+  transition:
+    color 0.3s ease,
+    border-color 0.3s ease,
+    background 0.3s ease;
+
+  &:hover {
+    color: var(--accent);
+    border-color: color-mix(in oklab, var(--accent) 55%, transparent);
+    background: color-mix(in oklab, var(--accent) 6%, transparent);
+  }
+}
+
+@utility drip-aura {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(
+    70rem 40rem at 82% -10%,
+    color-mix(in oklab, var(--accent) 7%, transparent),
+    transparent 70%
+  );
+}
+
+@utility drip-ring {
+  transition: stroke-dashoffset 1.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@utility drip-rule {
+  border-top: 1px solid var(--border);
+}
+
+@utility drip-scroller {
+  display: flex;
+  gap: 1.25rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 0.5rem;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  & > * {
+    scroll-snap-align: start;
+  }
+}
+
+@utility drip-live-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 oklch(0.56 0.142 40 / 60%);
+  animation: drip-pulse 1.8s infinite;
+}
+
+@keyframes drip-pulse {
+  0% {
+    box-shadow: 0 0 0 0 oklch(0.56 0.142 40 / 45%);
+  }
+  70% {
+    box-shadow: 0 0 0 0.7rem oklch(0.56 0.142 40 / 0%);
+  }
+  100% {
+    box-shadow: 0 0 0 0 oklch(0.56 0.142 40 / 0%);
+  }
+}
+
+@utility drip-rise {
+  animation: drip-rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes drip-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility drip-scan-sweep {
+  position: absolute;
+  inset-inline: 0;
+  height: 30%;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in oklab, white 55%, transparent),
+    transparent
+  );
+  filter: blur(2px);
+  animation: drip-sweep 1.9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes drip-sweep {
+  0% {
+    transform: translateY(-40%);
+    opacity: 0;
+  }
+  15%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(300%);
+    opacity: 0;
+  }
+}
+
+@utility drip-scan-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(color-mix(in oklab, white 22%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklab, white 22%, transparent) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(70% 60% at 50% 50%, black, transparent 78%);
+  animation: drip-grid-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes drip-grid-pulse {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@utility drip-count {
+  display: block;
+  animation: drip-count 0.75s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes drip-count {
+  from {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+

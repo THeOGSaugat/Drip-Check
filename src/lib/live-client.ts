@@ -31,6 +31,11 @@ export function useShowcaseMode() {
   return { showcase: enabled, toggleShowcase: toggle };
 }
 
+/** Resolves after `ms` — used to pad the scanning phase to a minimum duration. */
+export function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /** Grabs a JPEG frame from a live video element, downscaled for upload. */
 export function captureFrame(video: HTMLVideoElement, maxWidth = 720): string | null {
   const vw = video.videoWidth;

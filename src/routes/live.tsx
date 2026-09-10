@@ -21,7 +21,7 @@ import {
   getLiveLeaderboard,
   submitLiveScore,
 } from "@/lib/live-check.functions";
-import { captureFrame, getDeviceKey, useShowcaseMode } from "@/lib/live-client";
+import { captureFrame, getDeviceKey, useShowcaseMode, wait } from "@/lib/live-client";
 import type { FitAnalysis, FramingCheck } from "@/lib/live-types";
 import { cn } from "@/lib/utils";
 import liveCheckTheme from "@/assets/audio/live-check-theme.mp3";
@@ -51,6 +51,21 @@ type Phase = "idle" | "countdown" | "scanning" | "result";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
+// The scanning phase is held open for at least this long, regardless of how
+// fast the server responds — matches the server's own 13s AI budget, so the
+// visible countdown never finishes ahead of a slow request and then has to
+// awkwardly wait on it. Split into 5 even parts (2.6s each) for a realistic
+// full-circle turn: front, side, back, other side, back to front.
+const MIN_SCAN_MS = 13_000;
+const SCAN_STEPS = [
+  "Hold still — front on",
+  "Turn to your side",
+  "Turn your back",
+  "Turn to your other side",
+  "Face front again",
+] as const;
+const SCAN_STEP_MS = MIN_SCAN_MS / SCAN_STEPS.length;
+
 type Identity = { displayName: string; username: string; music: boolean };
 
 function LivePage() {
@@ -66,6 +81,7 @@ function LivePage() {
   const [error, setError] = useState<string | null>(null);
   const [posted, setPosted] = useState<{ rank: number } | null>(null);
   const [framing, setFraming] = useState<FramingCheck | null>(null);
+  const [scanStep, setScanStep] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const { showcase, toggleShowcase } = useShowcaseMode();
@@ -151,7 +167,14 @@ function LivePage() {
       if (!video) throw new Error("Camera is not ready.");
       const image = captureFrame(video);
       if (!image) throw new Error("Could not grab a frame — hold still and retry.");
-      return analyzeFit({ data: { image, deviceKey: getDeviceKey() } });
+      // Race the real request against a floor duration so the scan never
+      // feels instant/glitchy — whichever finishes last wins, capped by the
+      // server's own ~13s timeout budget so we never actually wait longer.
+      const [res] = await Promise.all([
+        analyzeFit({ data: { image, deviceKey: getDeviceKey() } }),
+        wait(MIN_SCAN_MS),
+      ]);
+      return res;
     },
     onSuccess: (res) => {
       stopMusic();
@@ -206,6 +229,20 @@ function LivePage() {
     const t = setTimeout(() => setCount((c) => c - 1), showcase ? 1100 : 800);
     return () => clearTimeout(t);
   }, [phase, count, showcase, runAnalysis]);
+
+  // Cycle the "turn this way" prompt through the scan window so the fixed
+  // MIN_SCAN_MS floor above actually reads as a guided full-circle turn, not a
+  // stalled spinner.
+  useEffect(() => {
+    if (phase !== "scanning") {
+      setScanStep(0);
+      return;
+    }
+    const t = setInterval(() => {
+      setScanStep((s) => Math.min(s + 1, SCAN_STEPS.length - 1));
+    }, SCAN_STEP_MS);
+    return () => clearInterval(t);
+  }, [phase]);
 
   // Showcase mode: auto-return to camera after a result
   useEffect(() => {
@@ -394,7 +431,7 @@ function LivePage() {
                 </div>
               )}
 
-              {phase === "scanning" && <ScanOverlay label="Checking the drip…" />}
+              {phase === "scanning" && <ScanOverlay label={SCAN_STEPS[scanStep]} />}
             </div>
 
             {error && (

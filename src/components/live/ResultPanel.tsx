@@ -80,7 +80,7 @@ export function ResultPanel({
           </span>
         </div>
         <ul className="mt-4 space-y-3">
-          {BREAKDOWN_LABELS.map(({ key, label }) => {
+          {BREAKDOWN_LABELS.filter(({ key }) => key !== "overall").map(({ key, label }) => {
             const cat = analysis.breakdown[key];
             return (
               <li key={key} className="space-y-1.5">

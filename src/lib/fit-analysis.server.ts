@@ -15,7 +15,7 @@ const LOVABLE_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions"
 const GEMINI_GATEWAY_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 /** Exported only as a label for callers building request bodies — the real
  * model choice per attempt happens in resolveProvider()/attempts below. */
-export const MODEL = "gemini-3.6-flash";
+export const MODEL = "gemini-3.5-flash-lite";
 
 const SYSTEM_PROMPT = `You are DripCheck, a fashion styling analyst for a live outfit-scoring booth.
 
@@ -44,16 +44,28 @@ clothing is visible.
 dripScore must be the average of the VISIBLE category scores only, 1.0-10.0 with one
 decimal. Most decent outfits land between 7.0 and 9.3.
 
+HARD CAP: a fit cannot be rated "decent" or better on a top alone. If "bottom" is not
+visible, dripScore must NOT exceed 6.0, no matter how good the visible top/styling looks —
+a full outfit needs the bottom shown to be properly judged. Only remove this cap when
+bottom is visible.
+
 visibleItems: short names of garments you can actually see (e.g. "Black tee", "Denim jacket").
 notVisible: short names of categories you could not see (e.g. "Shoes", "Accessories").
 
 verdict: one or two short punchy sentences in a warm Gen-Z tone, describing ONLY what is
 visible. Never reference items you cannot see.
 
-suggestions: 2-4 concrete tips based only on visible garments. If shoes are not visible,
-one suggestion must be "Show your full fit to get footwear recommendations." If
-accessories are not visible, one suggestion may say accessories aren't clearly visible.
-Never say "try different shoes" when shoes are not visible.
+suggestions: 2-3 short, punchy tips based only on visible garments. Each "text" must be
+ONE short imperative line, under 10 words, no paragraphs, no explanations, no "because"
+clauses — just the action. Match this style exactly:
+- "Add a watch and a chain to elevate the fit."
+- "Swap the sneakers for loafers."
+- "Tuck in the tee for a cleaner line."
+- "Layer a jacket over this for more depth."
+If shoes are not visible, one suggestion must be exactly "Show your full fit to get
+footwear recommendations." If accessories are not visible, one suggestion may note they
+aren't clearly visible, in the same short style. Never say "try different shoes" when
+shoes are not visible.
 
 If no person or clothing is visible, return coverage "none", dripScore 1.0, styleLabel
 "No Fit Detected", every category visible:false, and a verdict asking them to step into frame.`;
@@ -123,7 +135,7 @@ const SCHEMA = {
     suggestions: {
       type: "array",
       minItems: 2,
-      maxItems: 4,
+      maxItems: 3,
       items: {
         type: "object",
         additionalProperties: false,
@@ -196,26 +208,25 @@ export class AnalysisError extends Error {
 function resolveProvider(): { url: string; apiKey: string; model: string; fallbackModel: string } {
   const geminiKey = process.env["GEMINI_API_KEY"];
   if (geminiKey) {
-    // A personal Gemini key has no pooled capacity behind it, so the newest
-    // flash model returns 503 "high demand" often. gemini-2.5-flash is
-    // retired for new API keys (Google's API returns 404 NOT_FOUND and
-    // points to 3.6), so 3.6-flash is the stable primary; 3.7-flash (the
-    // newest) is only tried as a fallback.
+    // Lite is the primary now: the live check has a hard 13s wall-clock
+    // budget and flash-lite finishes structured JSON output far faster than
+    // the full flash tier. gemini-3.6-flash is the fallback — slower, but
+    // used only if flash-lite is overloaded/unavailable on this key.
     return {
       url: GEMINI_GATEWAY_URL,
       apiKey: geminiKey,
-      model: "gemini-3.6-flash",
-      fallbackModel: "gemini-3.7-flash",
+      model: "gemini-3.5-flash-lite",
+      fallbackModel: "gemini-3.6-flash",
     };
   }
   const lovableKey = process.env["LOVABLE_API_KEY"];
   if (lovableKey) {
-    // Lovable's gateway pools capacity across many users, so the newest
-    // model is worth trying first there for the better analysis quality.
+    // Same reasoning on the Lovable gateway: lite first for latency, regular
+    // flash as the fallback if lite is overloaded.
     return {
       url: LOVABLE_GATEWAY_URL,
       apiKey: lovableKey,
-      model: "google/gemini-3.7-flash",
+      model: "google/gemini-3.5-flash-lite",
       fallbackModel: "google/gemini-3.6-flash",
     };
   }
@@ -227,10 +238,9 @@ function resolveProvider(): { url: string; apiKey: string; model: string; fallba
 
 /**
  * Total wall-clock budget for one check, covering every attempt combined.
- * Kept comfortably under the 15s ceiling the product wants end-to-end, since
- * a little time outside this function (image transfer, our own request
- * handling) also counts against what the person standing at the camera
- * actually experiences.
+ * The product's ceiling is 13s end-to-end — this is that same 13s, since the
+ * client's scan-duration floor runs in parallel with this call (not stacked
+ * on top of it), so there's no extra time added outside this budget.
  */
 const TOTAL_BUDGET_MS = 13_000;
 /** Below this much remaining budget, a fresh attempt has no realistic chance
@@ -469,11 +479,11 @@ export async function analyzeOutfitImage(imageDataUrl: string): Promise<FitAnaly
   );
 
   const suggestions = (Array.isArray(data["suggestions"]) ? data["suggestions"] : [])
-    .slice(0, 4)
+    .slice(0, 3)
     .map((s: { icon?: unknown; title?: unknown; text?: unknown }) => ({
       icon: String(s?.icon ?? "✨").slice(0, 4),
       title: String(s?.title ?? "Try this").slice(0, 40),
-      text: String(s?.text ?? "").slice(0, 220),
+      text: String(s?.text ?? "").slice(0, 90),
     }))
     .filter((s) => s.text.length > 0);
 
@@ -485,9 +495,16 @@ export async function analyzeOutfitImage(imageDataUrl: string): Promise<FitAnaly
     });
   }
 
+  const rawDripScore =
+    coverage === "none" ? 1 : clampScore(data["dripScore"], Math.round(average * 10) / 10);
+  // Hard guardrail, independent of what the model returns: a top-only view
+  // (no visible bottom) can't score above 6.0. The prompt asks for this too,
+  // but we don't rely on the model honoring it consistently.
+  const dripScore =
+    coverage === "none" || breakdown.bottom.visible ? rawDripScore : Math.min(rawDripScore, 6.0);
+
   return {
-    dripScore:
-      coverage === "none" ? 1 : clampScore(data["dripScore"], Math.round(average * 10) / 10),
+    dripScore,
     styleLabel: String(data["styleLabel"] ?? "Everyday Fit").slice(0, 40),
     verdict: String(data["verdict"] ?? "Solid fit with room to level up.").slice(0, 300),
     occasion: String(data["occasion"] ?? "Everyday").slice(0, 40),
@@ -498,6 +515,6 @@ export async function analyzeOutfitImage(imageDataUrl: string): Promise<FitAnaly
       ? toList(data["notVisible"])
       : notVisibleFromBreakdown,
     breakdown,
-    suggestions: suggestions.slice(0, 4),
+    suggestions: suggestions.slice(0, 3),
   };
 }

@@ -1,36 +1,17 @@
 import { Check, Minus } from "lucide-react";
 import { ScoreRing } from "@/components/drip/ScoreRing";
 import { BREAKDOWN_LABELS, COVERAGE_LABEL, type FitAnalysis } from "@/lib/live-types";
-import { cn } from "@/lib/utils";
 
-export function ResultPanel({
-  analysis,
-  showcase,
-}: {
-  analysis: FitAnalysis;
-  showcase?: boolean;
-}) {
+export function ResultPanel({ analysis }: { analysis: FitAnalysis }) {
   return (
-    <div className={cn("space-y-6", showcase && "space-y-8")}>
+    <div className="space-y-6">
       <div className="drip-card flex flex-col items-center gap-6 rounded-3xl p-6 text-center drip-rise sm:flex-row sm:items-center sm:gap-8 sm:text-left">
-        <ScoreRing
-          score={analysis.dripScore}
-          size={showcase ? 220 : 148}
-          stroke={showcase ? 10 : 8}
-          label="Drip Score"
-        />
+        <ScoreRing score={analysis.dripScore} size={148} stroke={8} label="Drip Score" />
         <div className="space-y-2">
           <p className="text-[0.68rem] uppercase tracking-[0.3em] text-accent">
             {analysis.partial ? "Partial Fit Check" : "Full Fit Check"}
           </p>
-          <h2
-            className={cn(
-              "font-editorial leading-[1.05]",
-              showcase ? "text-6xl" : "text-4xl",
-            )}
-          >
-            {analysis.styleLabel}
-          </h2>
+          <h2 className="font-editorial text-4xl leading-[1.05]">{analysis.styleLabel}</h2>
           <p className="text-sm text-muted-foreground">
             Best for <span className="text-foreground">{analysis.occasion}</span>
           </p>
@@ -117,7 +98,7 @@ export function ResultPanel({
         <h3 className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-accent">
           The Verdict
         </h3>
-        <p className={cn("mt-3 font-editorial leading-snug", showcase ? "text-3xl" : "text-2xl")}>
+        <p className="mt-3 font-editorial text-2xl leading-snug">
           &ldquo;{analysis.verdict}&rdquo;
         </p>
       </section>

@@ -1,4 +1,4 @@
-import { Bookmark, Download, RotateCcw, Share2, Sparkles, Trophy } from "lucide-react";
+import { Download, RotateCcw, Share2, Sparkles } from "lucide-react";
 import { ScoreRing } from "@/components/drip/ScoreRing";
 import { PHOTO_BREAKDOWN_LABELS, type PhotoAnalysis } from "@/lib/photo-types";
 
@@ -7,26 +7,9 @@ type Props = {
   preview: string | null;
   onShare: () => void;
   onAnother: () => void;
-  onSubmit: () => void;
-  onSave: () => void;
-  saved?: boolean;
-  savingFit?: boolean;
-  submitting?: boolean;
-  submitNote?: string | null;
 };
 
-export function PhotoResult({
-  analysis,
-  preview,
-  onShare,
-  onAnother,
-  onSubmit,
-  onSave,
-  saved,
-  savingFit,
-  submitting,
-  submitNote,
-}: Props) {
+export function PhotoResult({ analysis, preview, onShare, onAnother }: Props) {
   return (
     <div className="space-y-8">
       <div className="grid gap-6 sm:grid-cols-[1fr_1.1fr]">
@@ -168,18 +151,7 @@ export function PhotoResult({
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <button
-          type="button"
-          className="drip-btn-primary"
-          onClick={onSave}
-          disabled={saved || savingFit}
-        >
-          <Bookmark className="h-4 w-4" /> {saved ? "Saved" : savingFit ? "Saving…" : "Save fit"}
-        </button>
-        <button type="button" className="drip-btn-ghost" onClick={onSubmit} disabled={submitting}>
-          <Trophy className="h-4 w-4" /> {submitting ? "Submitting…" : "Add to Today's Leaderboard"}
-        </button>
-        <button type="button" className="drip-btn-ghost" onClick={onShare}>
+        <button type="button" className="drip-btn-primary" onClick={onShare}>
           <Share2 className="h-4 w-4" /> Share result
         </button>
 
@@ -190,7 +162,6 @@ export function PhotoResult({
           <RotateCcw className="h-4 w-4" /> Check another fit
         </button>
       </div>
-      {submitNote && <p className="text-sm text-muted-foreground">{submitNote}</p>}
     </div>
   );
 }

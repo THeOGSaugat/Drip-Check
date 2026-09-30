@@ -3,21 +3,36 @@
  * Talks to the Lovable AI Gateway with a vision model. The API key never
  * leaves the server. Swap the model or provider here without touching the UI.
  *
- * Pipeline: frame -> person detection -> visible clothing detection ->
- * visible category detection -> score ONLY visible categories -> suggestions
- * derived only from what was actually seen.
+ * Pipeline: several frames of one slow turn -> one model call over all of them
+ * -> per-category visibility + score -> overall score computed HERE from the
+ * visible categories only -> anything said about unseen categories dropped.
+ * Used by both Live Check (personal) and the Rating Game (competitive), so the
+ * two can never score the same outfit differently.
  */
 
-import type { CategoryKey, CategoryScore, Coverage, FitAnalysis, FramingCheck } from "./live-types";
+import type { CategoryKey, Coverage, FitAnalysis, FramingCheck } from "./live-types";
+import { BREAKDOWN_LABELS } from "./live-types";
+import {
+  deriveCoverage,
+  dropUnseenAdvice,
+  dropUnseenItems,
+  normalizeCategory,
+  visibleAverage,
+} from "./fit-scoring";
 export type { FitAnalysis, FitBreakdown, FitSuggestion } from "./live-types";
 
 const LOVABLE_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const GEMINI_GATEWAY_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+const GEMINI_GATEWAY_URL =
+  "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 /** Exported only as a label for callers building request bodies — the real
  * model choice per attempt happens in resolveProvider()/attempts below. */
 export const MODEL = "gemini-3.5-flash-lite";
 
-const SYSTEM_PROMPT = `You are DripCheck, a fashion styling analyst for a live outfit-scoring booth.
+const SYSTEM_PROMPT = `You are DripCheck, a fashion styling analyst for a live outfit-scanning booth.
+
+You receive several frames of the SAME person, captured a moment apart while they slowly
+turn about 180 degrees in front of the camera (front, side, back). Treat all frames
+together as ONE outfit.
 
 You ONLY evaluate clothing and styling. You must NEVER assess, mention, infer or score:
 face, attractiveness, body shape, weight, height, age, race, skin tone, gender or any
@@ -25,50 +40,41 @@ physical attribute of the person. Judge the garments, colours, layering, footwea
 accessories and overall styling only.
 
 VISIBILITY IS THE MOST IMPORTANT RULE.
-Score a category ONLY if you can actually SEE it in this single frame.
-- If the frame is cropped at the waist, "bottom" and "shoes" are NOT visible.
+- A category is visible if it is clearly visible in AT LEAST ONE frame. Score it from
+  its clearest view.
+- If a category cannot be clearly seen in ANY frame, set visible:false and score 0.
+  The app shows it as "Not Visible" and leaves it out of the overall score, so there is
+  no penalty for it — which means there is never a reason to guess.
+- If every frame is cropped at the waist, "bottom" and "shoes" are NOT visible.
 - Never assume shoes exist because someone is standing.
-- Never invent accessories. Only mark accessories visible if you can point at one
-  (glasses, watch, chain, rings, cap, bag, belt, earrings...).
-- "layering" is visible only if you can see more than one layer or clearly see there is
-  a single layer covering the visible torso.
+- Never invent accessories. Mark accessories visible only if you can point at one
+  (glasses, watch, chain, rings, cap, bag, belt, earrings...) in a frame.
+- "layering" is visible only if you can see more than one layer, or clearly see a single
+  layer covering the torso.
 - If unsure, set visible:false. Guessing is worse than saying "not visible".
 
-For every category return { visible, score }. When visible is false, set score to 0 and
-the app will display "Not visible".
+SCORING
+- Score each visible category 1.0-10.0 with one decimal, on its own quality only.
+- NEVER lower a visible category because a different category is not visible. A great
+  top in a waist-up frame is still a great top.
+- Most decent outfits land between 7.0 and 9.3.
 
-coverage: "full" when torso AND legs AND feet are visible, "upper" when only the upper
-body is visible, "lower" when only the lower body is visible, "none" when no person or
-clothing is visible.
-
-dripScore must be the average of the VISIBLE category scores only, 1.0-10.0 with one
-decimal. Most decent outfits land between 7.0 and 9.3.
-
-HARD CAP: a fit cannot be rated "decent" or better on a top alone. If "bottom" is not
-visible, dripScore must NOT exceed 6.0, no matter how good the visible top/styling looks —
-a full outfit needs the bottom shown to be properly judged. Only remove this cap when
-bottom is visible.
-
-visibleItems: short names of garments you can actually see (e.g. "Black tee", "Denim jacket").
-notVisible: short names of categories you could not see (e.g. "Shoes", "Accessories").
+visibleItems: short names of garments and accessories you can actually see in the frames
+(e.g. "Black tee", "Denim jacket"). Never list anything you cannot see.
 
 verdict: one or two short punchy sentences in a warm Gen-Z tone, describing ONLY what is
 visible. Never reference items you cannot see.
 
-suggestions: 2-3 short, punchy tips based only on visible garments. Each "text" must be
-ONE short imperative line, under 10 words, no paragraphs, no explanations, no "because"
-clauses — just the action. Match this style exactly:
-- "Add a watch and a chain to elevate the fit."
-- "Swap the sneakers for loafers."
+suggestions: 2-3 short, punchy tips about the VISIBLE garments only. Each "text" must be
+ONE short imperative line, under 10 words, no paragraphs, no "because" clauses. Style:
 - "Tuck in the tee for a cleaner line."
 - "Layer a jacket over this for more depth."
-If shoes are not visible, one suggestion must be exactly "Show your full fit to get
-footwear recommendations." If accessories are not visible, one suggestion may note they
-aren't clearly visible, in the same short style. Never say "try different shoes" when
-shoes are not visible.
+- "Add a watch to elevate the fit."
+Never give advice about a category that is not visible — no shoe advice if shoes are not
+visible, no trouser advice if the bottom is not visible.
 
-If no person or clothing is visible, return coverage "none", dripScore 1.0, styleLabel
-"No Fit Detected", every category visible:false, and a verdict asking them to step into frame.`;
+If no person or clothing is visible in any frame, set every category visible:false,
+styleLabel "No Fit Detected", and a verdict asking them to step into frame.`;
 
 const CATEGORY_KEYS: CategoryKey[] = [
   "style",
@@ -94,19 +100,8 @@ const categoryProp = {
 const SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: [
-    "dripScore",
-    "styleLabel",
-    "verdict",
-    "occasion",
-    "coverage",
-    "visibleItems",
-    "notVisible",
-    "breakdown",
-    "suggestions",
-  ],
+  required: ["styleLabel", "verdict", "occasion", "visibleItems", "breakdown", "suggestions"],
   properties: {
-    dripScore: { type: "number" },
     styleLabel: {
       type: "string",
       description:
@@ -114,9 +109,7 @@ const SCHEMA = {
     },
     verdict: { type: "string" },
     occasion: { type: "string", description: "Best occasion this fit suits, max 5 words" },
-    coverage: { type: "string", enum: ["full", "upper", "lower", "none"] },
     visibleItems: { type: "array", maxItems: 6, items: { type: "string" } },
-    notVisible: { type: "array", maxItems: 6, items: { type: "string" } },
     breakdown: {
       type: "object",
       additionalProperties: false,
@@ -171,12 +164,6 @@ const FRAMING_SCHEMA = {
     message: { type: "string" },
   },
 } as const;
-
-function clampScore(n: unknown, fallback = 7.5): number {
-  const v = typeof n === "number" ? n : Number(n);
-  if (!Number.isFinite(v)) return fallback;
-  return Math.round(Math.min(10, Math.max(1, v)) * 10) / 10;
-}
 
 function parseJson(raw: string): unknown {
   try {
@@ -272,7 +259,10 @@ async function doFetch(
       throw new AnalysisError("The analysis service took too long to respond. Try again.", 504);
     }
     console.error(`[ai-gateway] fetch to ${url} failed:`, err);
-    throw new AnalysisError("Could not reach the analysis service. Check your internet connection.", 503);
+    throw new AnalysisError(
+      "Could not reach the analysis service. Check your internet connection.",
+      503,
+    );
   } finally {
     clearTimeout(timeout);
   }
@@ -292,7 +282,10 @@ export async function callGateway(body: Record<string, unknown>): Promise<string
   // fallback try; a real network stall/timeout eats the whole budget by
   // definition, so there's nothing left to retry with — and that's the
   // point: total time is capped no matter what happens.
-  const attempts: Array<{ model: string }> = [{ model: provider.model }, { model: provider.fallbackModel }];
+  const attempts: Array<{ model: string }> = [
+    { model: provider.model },
+    { model: provider.fallbackModel },
+  ];
 
   let lastError: { status: number; text: string } | null = null;
 
@@ -322,7 +315,10 @@ export async function callGateway(body: Record<string, unknown>): Promise<string
     }
 
     const text = await res.text();
-    console.error(`[ai-gateway] ${provider.url} (${attempt.model}) returned ${res.status}:`, text.slice(0, 1000));
+    console.error(
+      `[ai-gateway] ${provider.url} (${attempt.model}) returned ${res.status}:`,
+      text.slice(0, 1000),
+    );
     lastError = { status: res.status, text };
 
     // Only worth retrying/falling back on transient overload; anything else (bad
@@ -411,15 +407,16 @@ export async function checkFraming(imageDataUrl: string): Promise<FramingCheck> 
   };
 }
 
-function normalizeCategory(raw: unknown): CategoryScore {
-  const c = (raw ?? {}) as { visible?: unknown; score?: unknown };
-  const visible = Boolean(c.visible);
-  if (!visible) return { visible: false, score: null };
-  const score = clampScore(c.score, 7.5);
-  return { visible: true, score };
-}
+/**
+ * Analyses one outfit from several frames of the same scan in a single model
+ * call. Throws AnalysisError (422) when nothing wearable was visible in any
+ * frame, rather than returning a meaningless low score.
+ */
+export async function analyzeOutfitFrames(frames: string[]): Promise<FitAnalysis> {
+  if (frames.length === 0) {
+    throw new AnalysisError("No frames were captured — make sure the camera is on.", 400);
+  }
 
-export async function analyzeOutfitImage(imageDataUrl: string): Promise<FitAnalysis> {
   const content = await callGateway({
     model: MODEL,
     messages: [
@@ -429,9 +426,9 @@ export async function analyzeOutfitImage(imageDataUrl: string): Promise<FitAnaly
         content: [
           {
             type: "text",
-            text: "Analyze ONLY the clothing that is actually visible in this frame and return the scoring JSON.",
+            text: `These are ${frames.length} frames of one outfit, in capture order, taken while the person turned. Analyze ONLY the clothing that is actually visible and return the scoring JSON.`,
           },
-          { type: "image_url", image_url: { url: imageDataUrl } },
+          ...frames.map((url) => ({ type: "image_url", image_url: { url } })),
         ],
       },
     ],
@@ -448,60 +445,52 @@ export async function analyzeOutfitImage(imageDataUrl: string): Promise<FitAnaly
     CATEGORY_KEYS.map((key) => [key, normalizeCategory(rawBreakdown[key])]),
   ) as FitAnalysis["breakdown"];
 
-  const visibleScores = CATEGORY_KEYS.map((k) => breakdown[k]).filter(
-    (c): c is { visible: true; score: number } => c.visible && typeof c.score === "number",
-  );
-
-  const coverageRaw = String(data["coverage"] ?? "");
-  const coverage: Coverage = (["full", "upper", "lower", "none"] as const).includes(
-    coverageRaw as Coverage,
-  )
-    ? (coverageRaw as Coverage)
-    : visibleScores.length === 0
-      ? "none"
-      : breakdown.shoes.visible && breakdown.bottom.visible
-        ? "full"
-        : "upper";
-
-  const average =
-    visibleScores.length > 0
-      ? visibleScores.reduce((sum, c) => sum + c.score, 0) / visibleScores.length
-      : 1;
-
-  const toList = (v: unknown) =>
-    (Array.isArray(v) ? v : [])
-      .map((s) => String(s).slice(0, 40))
-      .filter(Boolean)
-      .slice(0, 6);
-
-  const notVisibleFromBreakdown = CATEGORY_KEYS.filter((k) => !breakdown[k].visible).map((k) =>
-    k === "colorCoordination" ? "Colors" : k.charAt(0).toUpperCase() + k.slice(1),
-  );
-
-  const suggestions = (Array.isArray(data["suggestions"]) ? data["suggestions"] : [])
-    .slice(0, 3)
-    .map((s: { icon?: unknown; title?: unknown; text?: unknown }) => ({
-      icon: String(s?.icon ?? "✨").slice(0, 4),
-      title: String(s?.title ?? "Try this").slice(0, 40),
-      text: String(s?.text ?? "").slice(0, 90),
-    }))
-    .filter((s) => s.text.length > 0);
-
-  if (!breakdown.shoes.visible && !suggestions.some((s) => /full fit/i.test(s.text))) {
-    suggestions.push({
-      icon: "👟",
-      title: "Show your shoes",
-      text: "Show your full fit to get footwear recommendations.",
-    });
+  // The overall score is the mean of the visible categories — computed here,
+  // never taken from the model, so an unseen category can't lower it.
+  const dripScore = visibleAverage(CATEGORY_KEYS.map((k) => breakdown[k]));
+  if (dripScore === null) {
+    throw new AnalysisError(
+      "We couldn't see an outfit in the scan — step into the frame and try again.",
+      422,
+    );
   }
 
-  const rawDripScore =
-    coverage === "none" ? 1 : clampScore(data["dripScore"], Math.round(average * 10) / 10);
-  // Hard guardrail, independent of what the model returns: a top-only view
-  // (no visible bottom) can't score above 6.0. The prompt asks for this too,
-  // but we don't rely on the model honoring it consistently.
-  const dripScore =
-    coverage === "none" || breakdown.bottom.visible ? rawDripScore : Math.min(rawDripScore, 6.0);
+  const seen = {
+    shoes: breakdown.shoes.visible,
+    bottom: breakdown.bottom.visible,
+    accessories: breakdown.accessories.visible,
+  };
+
+  const coverage: Coverage = deriveCoverage({
+    top: breakdown.top.visible,
+    layering: breakdown.layering.visible,
+    bottom: breakdown.bottom.visible,
+    shoes: breakdown.shoes.visible,
+    anything: true,
+  });
+
+  const visibleItems = dropUnseenItems(
+    (Array.isArray(data["visibleItems"]) ? data["visibleItems"] : [])
+      .map((v) => String(v).slice(0, 40).trim())
+      .filter(Boolean),
+    seen,
+  ).slice(0, 6);
+
+  const notVisible = BREAKDOWN_LABELS.filter(
+    ({ key }) => key !== "overall" && !breakdown[key].visible,
+  ).map(({ label }) => label);
+
+  const suggestions = dropUnseenAdvice(
+    (Array.isArray(data["suggestions"]) ? data["suggestions"] : [])
+      .slice(0, 3)
+      .map((s: { icon?: unknown; title?: unknown; text?: unknown }) => ({
+        icon: String(s?.icon ?? "✨").slice(0, 4),
+        title: String(s?.title ?? "Try this").slice(0, 40),
+        text: String(s?.text ?? "").slice(0, 90),
+      }))
+      .filter((s) => s.text.length > 0),
+    seen,
+  );
 
   return {
     dripScore,
@@ -510,11 +499,9 @@ export async function analyzeOutfitImage(imageDataUrl: string): Promise<FitAnaly
     occasion: String(data["occasion"] ?? "Everyday").slice(0, 40),
     coverage,
     partial: coverage !== "full",
-    visibleItems: toList(data["visibleItems"]),
-    notVisible: toList(data["notVisible"]).length
-      ? toList(data["notVisible"])
-      : notVisibleFromBreakdown,
+    visibleItems,
+    notVisible,
     breakdown,
-    suggestions: suggestions.slice(0, 3),
+    suggestions,
   };
 }

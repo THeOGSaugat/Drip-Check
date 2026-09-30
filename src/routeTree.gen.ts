@@ -11,13 +11,11 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
-import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CheckRouteImport } from './routes/check'
 import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as LiveRouteImport } from './routes/live'
-import { Route as ProfileRouteImport } from './routes/profile'
-import { Route as SavedRouteImport } from './routes/saved'
+import { Route as RatingGameRouteImport } from './routes/rating-game'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -27,11 +25,6 @@ const IndexRoute = IndexRouteImport.update({
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CheckRoute = CheckRouteImport.update({
@@ -54,97 +47,78 @@ const LiveRoute = LiveRouteImport.update({
   path: '/live',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ProfileRoute = ProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SavedRoute = SavedRouteImport.update({
-  id: '/saved',
-  path: '/saved',
+const RatingGameRoute = RatingGameRouteImport.update({
+  id: '/rating-game',
+  path: '/rating-game',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
-  '/auth': typeof AuthRoute
   '/check': typeof CheckRoute
   '/discover': typeof DiscoverRoute
   '/leaderboard': typeof LeaderboardRoute
   '/live': typeof LiveRoute
-  '/profile': typeof ProfileRoute
-  '/saved': typeof SavedRoute
+  '/rating-game': typeof RatingGameRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
-  '/auth': typeof AuthRoute
   '/check': typeof CheckRoute
   '/discover': typeof DiscoverRoute
   '/leaderboard': typeof LeaderboardRoute
   '/live': typeof LiveRoute
-  '/profile': typeof ProfileRoute
-  '/saved': typeof SavedRoute
+  '/rating-game': typeof RatingGameRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
-  '/auth': typeof AuthRoute
   '/check': typeof CheckRoute
   '/discover': typeof DiscoverRoute
   '/leaderboard': typeof LeaderboardRoute
   '/live': typeof LiveRoute
-  '/profile': typeof ProfileRoute
-  '/saved': typeof SavedRoute
+  '/rating-game': typeof RatingGameRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/about'
-    | '/auth'
     | '/check'
     | '/discover'
     | '/leaderboard'
     | '/live'
-    | '/profile'
-    | '/saved'
+    | '/rating-game'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/about'
-    | '/auth'
     | '/check'
     | '/discover'
     | '/leaderboard'
     | '/live'
-    | '/profile'
-    | '/saved'
+    | '/rating-game'
   id:
     | '__root__'
     | '/'
     | '/about'
-    | '/auth'
     | '/check'
     | '/discover'
     | '/leaderboard'
     | '/live'
-    | '/profile'
-    | '/saved'
+    | '/rating-game'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
-  AuthRoute: typeof AuthRoute
   CheckRoute: typeof CheckRoute
   DiscoverRoute: typeof DiscoverRoute
   LeaderboardRoute: typeof LeaderboardRoute
   LiveRoute: typeof LiveRoute
-  ProfileRoute: typeof ProfileRoute
-  SavedRoute: typeof SavedRoute
+  RatingGameRoute: typeof RatingGameRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -161,13 +135,6 @@ declare module '@tanstack/react-router' {
       path: '/about'
       fullPath: '/about'
       preLoaderRoute: typeof AboutRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/check': {
@@ -198,18 +165,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LiveRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/profile': {
-      id: '/profile'
-      path: '/profile'
-      fullPath: '/profile'
-      preLoaderRoute: typeof ProfileRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/saved': {
-      id: '/saved'
-      path: '/saved'
-      fullPath: '/saved'
-      preLoaderRoute: typeof SavedRouteImport
+    '/rating-game': {
+      id: '/rating-game'
+      path: '/rating-game'
+      fullPath: '/rating-game'
+      preLoaderRoute: typeof RatingGameRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -218,13 +178,11 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
-  AuthRoute: AuthRoute,
   CheckRoute: CheckRoute,
   DiscoverRoute: DiscoverRoute,
   LeaderboardRoute: LeaderboardRoute,
   LiveRoute: LiveRoute,
-  ProfileRoute: ProfileRoute,
-  SavedRoute: SavedRoute,
+  RatingGameRoute: RatingGameRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

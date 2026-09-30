@@ -80,6 +80,7 @@ export type Database = {
       live_scores: {
         Row: {
           breakdown: Json
+          check_type: string
           created_at: string
           device_key: string
           display_name: string
@@ -91,6 +92,7 @@ export type Database = {
         }
         Insert: {
           breakdown?: Json
+          check_type: string
           created_at?: string
           device_key: string
           display_name: string
@@ -102,6 +104,7 @@ export type Database = {
         }
         Update: {
           breakdown?: Json
+          check_type?: string
           created_at?: string
           device_key?: string
           display_name?: string

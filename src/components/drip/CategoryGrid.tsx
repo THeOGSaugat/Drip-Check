@@ -47,8 +47,8 @@ export function GenderTabs({
             className={cn(
               "rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] transition-colors",
               active
-                ? "bg-foreground text-background"
-                : "text-muted-foreground hover:text-foreground",
+                ? "bg-sapphire text-ivory shadow-sm"
+                : "text-muted-foreground hover:bg-champagne/60 hover:text-navy",
             )}
           >
             {tab.label}

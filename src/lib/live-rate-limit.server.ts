@@ -1,17 +1,15 @@
 /**
- * Lightweight in-memory rate limiting for the live booth.
- * Keeps a single device from spamming analyses or leaderboard entries.
+ * Lightweight in-memory rate limiting for the scan booth and photo check.
+ * Keeps a single device from spamming analyses. Leaderboard entries are capped
+ * separately, in the database, by rating-game.server.ts.
  */
 
 type Bucket = { last: number; hits: number[] };
 
 const analysisBuckets = new Map<string, Bucket>();
-const submitBuckets = new Map<string, Bucket>();
 
 const ANALYSIS_COOLDOWN_MS = 4_000;
 const ANALYSIS_PER_MINUTE = 8;
-const SUBMIT_COOLDOWN_MS = 45_000;
-const SUBMIT_PER_HOUR = 5;
 
 function prune(hits: number[], windowMs: number) {
   const cutoff = Date.now() - windowMs;
@@ -71,17 +69,5 @@ export function checkFramingRate(deviceKey: string) {
     12,
     "Checking your framing — one sec.",
     "Too many framing checks. Wait a minute.",
-  );
-}
-
-export function checkSubmitRate(deviceKey: string) {
-  return gate(
-    submitBuckets,
-    deviceKey,
-    SUBMIT_COOLDOWN_MS,
-    60 * 60_000,
-    SUBMIT_PER_HOUR,
-    "You just posted a score — wait a moment before posting again.",
-    "This device already posted 5 fits this hour.",
   );
 }

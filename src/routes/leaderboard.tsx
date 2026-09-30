@@ -1,9 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/drip/PageHeader";
-import { getLiveLeaderboard } from "@/lib/live-check.functions";
+import { useDailyLeaderboard } from "@/hooks/use-daily-leaderboard";
 
 export const Route = createFileRoute("/leaderboard")({
   head: () => ({
@@ -12,7 +11,7 @@ export const Route = createFileRoute("/leaderboard")({
       {
         name: "description",
         content:
-          "See today's highest Drip Scores from real Live Fit Checks and how your fit stacks up against the community.",
+          "See today's highest Drip Scores from the DripCheck Rating Game and how your fit stacks up.",
       },
       { property: "og:title", content: "Daily Leaderboard — DripCheck" },
       { property: "og:description", content: "Today's highest scoring fits." },
@@ -24,10 +23,8 @@ export const Route = createFileRoute("/leaderboard")({
 const MEDALS = ["🥇", "🥈", "🥉"];
 
 function LeaderboardPage() {
-  const { data, isLoading } = useQuery({
-    queryKey: ["live-leaderboard"],
-    queryFn: () => getLiveLeaderboard(),
-  });
+  // Rating Game results only — personal Live / Photo checks never save scores.
+  const { data, isLoading } = useDailyLeaderboard();
   const entries = data?.entries ?? [];
   const podium = entries.slice(0, 3);
   const rest = entries.slice(3);
@@ -37,7 +34,7 @@ function LeaderboardPage() {
       <PageHeader
         eyebrow="Leaderboard"
         title="Today's Drip"
-        subtitle="Rankings reset every 24 hours. Only real Live Fit Checks from the last day show up here."
+        subtitle="Only Rating Game results count. Rankings reset at midnight."
       />
 
       {isLoading && (
@@ -52,11 +49,11 @@ function LeaderboardPage() {
         <div className="drip-card flex flex-col items-center gap-4 rounded-3xl p-12 text-center">
           <Camera className="h-6 w-6 text-accent" />
           <p className="max-w-sm text-sm text-muted-foreground">
-            No fits scored yet today. The board fills up as people take a Live Fit Check — be the
+            No scores yet today. The board fills up as people play the Rating Game — be the
             first one on it.
           </p>
-          <Link to="/live" className="drip-btn-primary">
-            Start Live Fit Check
+          <Link to="/rating-game" className="drip-btn-primary">
+            Play the Rating Game
           </Link>
         </div>
       )}
@@ -68,7 +65,7 @@ function LeaderboardPage() {
               key={entry.id}
               className={cn(
                 "drip-card relative flex flex-col items-center gap-2 overflow-hidden rounded-3xl p-6 text-center",
-                i === 0 && "sm:order-2 sm:-translate-y-3 border-accent/40 shadow-lg shadow-black/[0.06]",
+                i === 0 && "sm:order-2 sm:-translate-y-3 border-accent/40 shadow-lg",
                 i === 1 && "sm:order-1",
                 i === 2 && "sm:order-3",
               )}
@@ -112,7 +109,7 @@ function LeaderboardPage() {
           {rest.map((entry) => (
             <li
               key={entry.id}
-              className="drip-card flex items-center gap-4 rounded-2xl p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-md hover:shadow-black/[0.04]"
+              className="drip-card flex items-center gap-4 rounded-2xl p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-md"
             >
               <span className="w-8 text-center font-display text-lg font-bold text-muted-foreground">
                 {entry.rank}

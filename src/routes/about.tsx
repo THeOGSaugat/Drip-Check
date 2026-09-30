@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Github, Linkedin, Mail, ArrowUpRight } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Camera, ImageUp, Medal, Sparkles, Trophy } from "lucide-react";
+import type { ComponentType } from "react";
 import { PageHeader } from "@/components/drip/PageHeader";
 
 export const Route = createFileRoute("/about")({
@@ -9,48 +10,54 @@ export const Route = createFileRoute("/about")({
       {
         name: "description",
         content:
-          "DripCheck is an AI-powered fashion platform for those who love to enhance their fit. Meet the developers, Saugat Rai and Kiran Rai, behind the app.",
+          "DripCheck is an AI-powered fashion platform for understanding, improving and experimenting with your personal style — Live Check, Photo Check, the Rating Game and a daily Top 3.",
       },
       { property: "og:title", content: "About Us — DripCheck" },
       {
         property: "og:description",
-        content: "For those who love to enhance their fit. Meet the developers building DripCheck.",
+        content: "Fashion should be fun, personal and easy to explore. Check your fit with AI.",
       },
     ],
   }),
   component: AboutPage,
 });
 
-type Developer = {
-  name: string;
-  role: string;
-  initials: string;
-  bio: string;
-  links: { icon: typeof Github; label: string; href: string }[];
+type Feature = {
+  icon: ComponentType<{ className?: string }>;
+  title: string;
+  body: string;
+  link?: { to: string; label: string };
 };
 
-const DEVELOPERS: Developer[] = [
+const FEATURES: Feature[] = [
   {
-    name: "Saugat Rai",
-    role: "Design • Frontend • Creative Ideas",
-    initials: "SR",
-    bio: "Saugat focuses on DripCheck's design and frontend experience, along with creative ideas and shaping new concepts for the app.",
-    links: [
-      { icon: Github, label: "GitHub", href: "https://github.com/" },
-      { icon: Linkedin, label: "LinkedIn", href: "https://linkedin.com/" },
-      { icon: Mail, label: "Email", href: "mailto:hello@dripcheck.app" },
-    ],
+    icon: Camera,
+    title: "Live Check",
+    body: "Analyze your outfit in real time using your camera.",
+    link: { to: "/live", label: "Start a Live Check" },
   },
   {
-    name: "Kiran Rai",
-    role: "Backend • Features • Development",
-    initials: "KR",
-    bio: "Kiran focuses on the backend, implementing new features, handling development tasks, and building the functionality behind DripCheck.",
-    links: [
-      { icon: Github, label: "GitHub", href: "https://github.com/" },
-      { icon: Linkedin, label: "LinkedIn", href: "https://linkedin.com/" },
-      { icon: Mail, label: "Email", href: "mailto:hello@dripcheck.app" },
-    ],
+    icon: ImageUp,
+    title: "Photo Check",
+    body: "Upload an outfit photo and get AI-powered feedback.",
+    link: { to: "/check", label: "Upload a photo" },
+  },
+  {
+    icon: Medal,
+    title: "Rating Game",
+    body: "Compete by getting your outfit rated and appear on the daily leaderboard.",
+    link: { to: "/rating-game", label: "Play the Rating Game" },
+  },
+  {
+    icon: Trophy,
+    title: "Daily Top 3",
+    body: "See the highest-rated outfits of the day.",
+    link: { to: "/leaderboard", label: "See today's board" },
+  },
+  {
+    icon: Sparkles,
+    title: "Outfit Analysis",
+    body: "Get feedback on clothing, colors, shoes, accessories and overall styling.",
   },
 ];
 
@@ -58,44 +65,43 @@ function AboutPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-12 px-5 py-10 sm:px-8">
       <PageHeader
-        eyebrow="About DripCheck"
-        title="For those who love to enhance their fit."
-        subtitle="DripCheck is an AI-powered fashion platform made for fashion lovers who want to enhance their outfits, discover better combinations, and feel more confident in what they wear."
+        eyebrow="About Us"
+        title="About DripCheck"
+        subtitle="DripCheck is an AI-powered fashion platform built for people who want to understand, improve, and experiment with their personal style."
       />
 
       <section className="drip-card rounded-3xl p-8 sm:p-10">
         <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          Get outfit feedback, discover styling suggestions, and find inspiration to take your
-          everyday fit to the next level.
+          It allows you to check your outfits using AI, get personalized style feedback, and explore
+          different ways to improve your overall look.
         </p>
       </section>
 
       <div className="grid gap-6 sm:grid-cols-2">
         <section className="drip-card rounded-3xl p-8">
           <h2 className="font-editorial text-2xl leading-snug">
-            Made for Fashion Lovers. Inspired by Pinterest.
+            Fashion should be fun, personal and easy to explore.
           </h2>
           <span
             aria-hidden="true"
             className="mt-3 block h-px w-12 bg-gradient-to-r from-accent to-transparent"
           />
           <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-            DripCheck brings Pinterest-inspired fashion aesthetics into an interactive
-            experience, helping you explore creative outfit ideas and improve your personal
-            style.
+            That&apos;s the main idea behind DripCheck. It helps you understand your outfit and
+            experiment with your look — no stylist, no pressure, just honest feedback on what
+            you&apos;re wearing.
           </p>
         </section>
         <section className="drip-card rounded-3xl p-8">
-          <h2 className="font-editorial text-2xl leading-snug">Built for Everyday Confidence</h2>
+          <h2 className="font-editorial text-2xl leading-snug">Made for every kind of day</h2>
           <span
             aria-hidden="true"
             className="mt-3 block h-px w-12 bg-gradient-to-r from-accent to-transparent"
           />
           <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-            DripCheck is also designed with IIC students in mind, helping students figure out
-            what to wear, how to combine their pieces, and how to improve their everyday fits.
-            Because when you feel confident in what you&apos;re wearing, you can take on
-            anything.
+            Whether you&apos;re getting ready for college, going out with friends, attending a
+            party, or simply trying a different style, DripCheck helps you see what&apos;s working
+            and what could make the fit even better.
           </p>
         </section>
       </div>
@@ -111,38 +117,27 @@ function AboutPage() {
         <header className="space-y-2">
           <span className="drip-chip border-accent/25 bg-accent/[0.07] text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-accent">
             <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />
-            Meet the Developers
+            What you can do
           </span>
-          <h2 className="font-editorial text-3xl">The team behind DripCheck</h2>
+          <h2 className="font-editorial text-3xl">Everything in DripCheck</h2>
         </header>
 
-        <div className="grid gap-6 sm:grid-cols-2">
-          {DEVELOPERS.map((dev) => (
-            <article key={dev.name} className="drip-card flex flex-col gap-5 rounded-3xl p-8">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-sand font-display text-lg font-bold text-accent">
-                {dev.initials}
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {FEATURES.map((feature) => (
+            <article key={feature.title} className="drip-card flex flex-col gap-5 rounded-3xl p-8">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-sand text-accent">
+                <feature.icon className="h-6 w-6" />
               </div>
-              <div>
-                <h3 className="font-editorial text-2xl">{dev.name}</h3>
-                <p className="text-[0.68rem] uppercase tracking-[0.2em] text-muted-foreground">
-                  {dev.role}
-                </p>
-              </div>
-              <p className="text-sm leading-relaxed text-muted-foreground">{dev.bio}</p>
-              <div className="flex items-center gap-4 pt-1">
-                {dev.links.map((link) => (
-                  <a
-                    key={link.label}
-                    href={link.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    title={link.label}
-                    className="text-muted-foreground transition-colors hover:text-accent"
-                  >
-                    <link.icon className="h-4 w-4" />
-                  </a>
-                ))}
-              </div>
+              <h3 className="font-editorial text-2xl">{feature.title}</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">{feature.body}</p>
+              {feature.link && (
+                <Link
+                  to={feature.link.to}
+                  className="mt-auto inline-flex w-fit items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-accent transition-colors hover:text-foreground"
+                >
+                  {feature.link.label} <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              )}
             </article>
           ))}
         </div>
@@ -150,7 +145,8 @@ function AboutPage() {
 
       <section className="drip-card rounded-3xl p-8 text-center sm:p-10">
         <p className="font-editorial text-xl sm:text-2xl">
-          DripCheck — <span className="text-muted-foreground">Your fit. Your style. Your confidence.</span>
+          DripCheck —{" "}
+          <span className="text-muted-foreground">Your fit. Your style. Your confidence.</span>
         </p>
         <Link to="/check" className="drip-btn-primary mt-6 inline-flex w-fit">
           Try DripCheck <ArrowUpRight className="h-4 w-4" />

@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, Sparkles } from "lucide-react";
+import { ArrowRight, Loader2, Sparkles } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -56,7 +56,16 @@ function MatchRing({ percent }: { percent: number }) {
   );
 }
 
-export function CompareFitModal({ fit }: { fit: Fit }) {
+export function CompareFitModal({
+  fit,
+  triggerClassName,
+  triggerLabel = "Compare with my style",
+}: {
+  fit: Fit;
+  /** Opt into a custom trigger style. Omit it for the default Discover chip. */
+  triggerClassName?: string;
+  triggerLabel?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [stage, setStage] = useState<Stage>("upload");
   const [preview, setPreview] = useState<string | null>(null);
@@ -102,13 +111,20 @@ export function CompareFitModal({ fit }: { fit: Fit }) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="drip-chip flex items-center gap-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-foreground transition-colors hover:text-accent"
-      >
-        <Sparkles className="h-3.5 w-3.5" /> Compare with my style
-      </button>
+      {triggerClassName ? (
+        <button type="button" onClick={() => setOpen(true)} className={triggerClassName}>
+          {triggerLabel}
+          <ArrowRight className="h-3.5 w-3.5" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="drip-chip flex items-center gap-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-foreground transition-colors hover:text-accent"
+        >
+          <Sparkles className="h-3.5 w-3.5" /> {triggerLabel}
+        </button>
+      )}
 
       <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto rounded-3xl">
         <DialogHeader>

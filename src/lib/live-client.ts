@@ -1,7 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
-
 const DEVICE_KEY = "dripcheck.device-key";
-const SHOWCASE_KEY = "dripcheck.showcase-mode";
 
 export function getDeviceKey(): string {
   if (typeof window === "undefined") return "server-side-device-key";
@@ -13,27 +10,16 @@ export function getDeviceKey(): string {
   return key;
 }
 
-export function useShowcaseMode() {
-  const [enabled, setEnabled] = useState(false);
-
-  useEffect(() => {
-    setEnabled(window.localStorage.getItem(SHOWCASE_KEY) === "1");
-  }, []);
-
-  const toggle = useCallback(() => {
-    setEnabled((prev) => {
-      const next = !prev;
-      window.localStorage.setItem(SHOWCASE_KEY, next ? "1" : "0");
-      return next;
-    });
-  }, []);
-
-  return { showcase: enabled, toggleShowcase: toggle };
-}
-
-/** Resolves after `ms` — used to pad the scanning phase to a minimum duration. */
-export function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/** Shares (or copies) a one-line result. Returns false if nothing happened. */
+export async function shareFitResult(score: number, styleLabel: string): Promise<boolean> {
+  const text = `I scored ${score.toFixed(1)} 🔥 on DripCheck — ${styleLabel}`;
+  try {
+    if (navigator.share) await navigator.share({ title: "DripCheck", text });
+    else await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false; // dismissed or unavailable
+  }
 }
 
 /** Grabs a JPEG frame from a live video element, downscaled for upload. */

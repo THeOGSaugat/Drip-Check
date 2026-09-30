@@ -5,12 +5,14 @@
  */
 
 import { AnalysisError, callGateway, MODEL } from "./fit-analysis.server";
-import type {
-  PhotoAnalysis,
-  PhotoBreakdown,
-  PhotoCategory,
-  PhotoCategoryKey,
-} from "./photo-types";
+import {
+  dropUnseenAdvice,
+  dropUnseenItems,
+  normalizeCategory,
+  visibleAverage,
+} from "./fit-scoring";
+import type { PhotoAnalysis, PhotoBreakdown, PhotoCategoryKey } from "./photo-types";
+import { PHOTO_BREAKDOWN_LABELS } from "./photo-types";
 
 const SYSTEM_PROMPT = `You are DripCheck, a fashion styling analyst reviewing a single uploaded outfit photo.
 
@@ -21,19 +23,23 @@ accessories and overall styling only.
 
 VISIBILITY RULE: score a category only if you can actually SEE it in the photo.
 If the photo is cropped at the waist, shoes are NOT visible. Never invent accessories.
-When a category is not visible set visible:false and score 0.
+When a category is not visible set visible:false and score 0 — the app shows it as
+"Not Visible" and leaves it out of the overall score, so there is no reason to guess.
+Score each visible category 1.0-10.0 on its own quality; NEVER lower one because a
+different category is not visible.
 
-dripScore: average of the visible category scores, 1.0-10.0 with one decimal.
 styleLabel: short style name, e.g. Clean Streetwear, Minimal Core, Y2K Energy, Old Money.
 summary: 1-2 calm sentences describing only the visible outfit direction.
-working: 2-3 short positive observations about what actually works.
-levelUp: 3 constructive, concrete suggestions (title 2-4 words + one sentence).
+working: 2-3 short positive observations about what actually works — visible items only.
+levelUp: 3 constructive, concrete suggestions (title 2-4 words + one sentence) about the
+visible outfit only. No shoe advice if shoes are not visible.
 palette: the dominant garment colours you can see (2-5), name plus closest hex.
 combos: 2-3 recommended colour pairings, formatted like "Black + Cream".
 styleMatch: 3 style families with a 0-100 percent match, highest first.
-visibleItems: garments you can see. notVisible: categories you could not see.
+visibleItems: garments you can see. Never list anything you cannot see.
+notVisible: parts of the outfit you could not see (e.g. "Shoes", "Bottom").
 
-If no person or clothing is visible, set every category visible:false, dripScore 1.0,
+If no person or clothing is visible, set every category visible:false,
 styleLabel "No Fit Detected" and say so in the summary.`;
 
 const categoryProp = {
@@ -52,7 +58,6 @@ const SCHEMA = {
   type: "object",
   additionalProperties: false,
   required: [
-    "dripScore",
     "styleLabel",
     "summary",
     "occasion",
@@ -66,7 +71,6 @@ const SCHEMA = {
     "styleMatch",
   ],
   properties: {
-    dripScore: { type: "number" },
     styleLabel: { type: "string" },
     summary: { type: "string" },
     occasion: { type: "string" },
@@ -125,12 +129,6 @@ const SCHEMA = {
   },
 } as const;
 
-function clampScore(n: unknown, fallback = 7.5): number {
-  const v = typeof n === "number" ? n : Number(n);
-  if (!Number.isFinite(v)) return fallback;
-  return Math.round(Math.min(10, Math.max(1, v)) * 10) / 10;
-}
-
 function parseJson(raw: string): Record<string, unknown> {
   try {
     return JSON.parse(raw) as Record<string, unknown>;
@@ -142,12 +140,6 @@ function parseJson(raw: string): Record<string, unknown> {
     }
     throw new AnalysisError("The analyzer returned an unreadable response.", 502);
   }
-}
-
-function normalizeCategory(raw: unknown): PhotoCategory {
-  const c = (raw ?? {}) as { visible?: unknown; score?: unknown };
-  if (!c.visible) return { visible: false, score: null };
-  return { visible: true, score: clampScore(c.score) };
 }
 
 const text = (v: unknown, fallback: string, max: number) =>
@@ -189,11 +181,33 @@ export async function analyzeOutfitPhoto(imageDataUrl: string): Promise<PhotoAna
     KEYS.map((k) => [k, normalizeCategory(rawBreakdown[k])]),
   ) as PhotoBreakdown;
 
-  const visible = KEYS.map((k) => breakdown[k]).filter(
-    (c): c is { visible: true; score: number } => c.visible && typeof c.score === "number",
+  // Overall = mean of the visible categories only, computed here rather than
+  // taken from the model, so an unseen category can never lower it.
+  const dripScore = visibleAverage(KEYS.map((k) => breakdown[k]));
+  if (dripScore === null) {
+    throw new AnalysisError(
+      "We couldn't see an outfit in this photo — try a clearer, well-lit fit pic.",
+      422,
+    );
+  }
+
+  const seen = { shoes: breakdown.shoes.visible, accessories: breakdown.accessories.visible };
+
+  // Categories we scored as unseen, plus any extra parts the model reports
+  // (e.g. "Bottom"), minus anything that contradicts a category it DID see.
+  const visibleLabels = PHOTO_BREAKDOWN_LABELS.filter(({ key }) => breakdown[key].visible).map(
+    ({ label }) => label.toLowerCase(),
   );
-  const average =
-    visible.length > 0 ? visible.reduce((s, c) => s + c.score, 0) / visible.length : 1;
+  const notVisible = [
+    ...PHOTO_BREAKDOWN_LABELS.filter(({ key }) => !breakdown[key].visible).map(
+      ({ label }) => label,
+    ),
+    ...list(data["notVisible"], 6, 40),
+  ].filter(
+    (item, i, all) =>
+      !visibleLabels.includes(item.toLowerCase()) &&
+      all.findIndex((x) => x.toLowerCase() === item.toLowerCase()) === i,
+  );
 
   const palette = (Array.isArray(data["palette"]) ? data["palette"] : [])
     .slice(0, 5)
@@ -202,13 +216,16 @@ export async function analyzeOutfitPhoto(imageDataUrl: string): Promise<PhotoAna
       hex: HEX.test(String(p?.hex ?? "")) ? String(p.hex) : "#8a8a8a",
     }));
 
-  const levelUp = (Array.isArray(data["levelUp"]) ? data["levelUp"] : [])
-    .slice(0, 3)
-    .map((t: { title?: unknown; text?: unknown }) => ({
-      title: text(t?.title, "Try this", 40),
-      text: text(t?.text, "", 220),
-    }))
-    .filter((t) => t.text.length > 0);
+  const levelUp = dropUnseenAdvice(
+    (Array.isArray(data["levelUp"]) ? data["levelUp"] : [])
+      .slice(0, 3)
+      .map((t: { title?: unknown; text?: unknown }) => ({
+        title: text(t?.title, "Try this", 40),
+        text: text(t?.text, "", 220),
+      }))
+      .filter((t) => t.text.length > 0),
+    seen,
+  );
 
   const styleMatch = (Array.isArray(data["styleMatch"]) ? data["styleMatch"] : [])
     .slice(0, 3)
@@ -220,14 +237,14 @@ export async function analyzeOutfitPhoto(imageDataUrl: string): Promise<PhotoAna
 
   return {
     source: "ai",
-    dripScore: visible.length === 0 ? 1 : clampScore(data["dripScore"], Math.round(average * 10) / 10),
+    dripScore,
     styleLabel: text(data["styleLabel"], "Everyday Fit", 40),
     summary: text(data["summary"], "Solid fit with room to level up.", 320),
     occasion: text(data["occasion"], "Everyday", 40),
-    visibleItems: list(data["visibleItems"], 6, 40),
-    notVisible: list(data["notVisible"], 6, 40),
+    visibleItems: dropUnseenItems(list(data["visibleItems"], 6, 40), seen),
+    notVisible: notVisible.slice(0, 6),
     breakdown,
-    working: list(data["working"], 3, 90),
+    working: dropUnseenItems(list(data["working"], 3, 90), seen),
     levelUp,
     palette: palette.length ? palette : [{ name: "Neutral", hex: "#8a8a8a" }],
     combos: list(data["combos"], 3, 40),

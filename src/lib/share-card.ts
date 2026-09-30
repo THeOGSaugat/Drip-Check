@@ -11,16 +11,16 @@ export async function renderShareCard(analysis: PhotoAnalysis): Promise<Blob | n
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
 
-  ctx.fillStyle = "#faf8f4";
+  ctx.fillStyle = "#f5f4f0";
   ctx.fillRect(0, 0, W, H);
 
-  ctx.strokeStyle = "rgba(30,28,26,0.16)";
+  ctx.strokeStyle = "rgba(17,34,80,0.16)";
   ctx.lineWidth = 2;
   ctx.strokeRect(56, 56, W - 112, H - 112);
 
-  const ink = "#221f1c";
-  const muted = "#807a72";
-  const accent = "#b4562f";
+  const ink = "#112250";
+  const muted = "#535b71";
+  const accent = "#3b507d";
 
   ctx.textAlign = "center";
   ctx.fillStyle = ink;
@@ -48,15 +48,16 @@ export async function renderShareCard(analysis: PhotoAnalysis): Promise<Blob | n
     ctx.arc(startX + i * gap, 680, 30, 0, Math.PI * 2);
     ctx.fillStyle = c.hex;
     ctx.fill();
-    ctx.strokeStyle = "rgba(30,28,26,0.2)";
+    ctx.strokeStyle = "rgba(17,34,80,0.2)";
     ctx.lineWidth = 2;
     ctx.stroke();
   });
 
   // breakdown rows
-  const rows = PHOTO_BREAKDOWN_LABELS.filter(
-    ({ key }) => analysis.breakdown[key].visible,
-  ).slice(0, 4);
+  const rows = PHOTO_BREAKDOWN_LABELS.filter(({ key }) => analysis.breakdown[key].visible).slice(
+    0,
+    4,
+  );
   let y = 810;
   rows.forEach(({ key, label }) => {
     const score = analysis.breakdown[key].score;
@@ -71,7 +72,7 @@ export async function renderShareCard(analysis: PhotoAnalysis): Promise<Blob | n
     ctx.beginPath();
     ctx.moveTo(160, y + 22);
     ctx.lineTo(W - 160, y + 22);
-    ctx.strokeStyle = "rgba(30,28,26,0.12)";
+    ctx.strokeStyle = "rgba(17,34,80,0.12)";
     ctx.lineWidth = 1;
     ctx.stroke();
     y += 78;
@@ -93,7 +94,9 @@ export async function renderShareCard(analysis: PhotoAnalysis): Promise<Blob | n
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
 }
 
-export async function shareOrDownloadCard(analysis: PhotoAnalysis): Promise<"shared" | "downloaded" | "failed"> {
+export async function shareOrDownloadCard(
+  analysis: PhotoAnalysis,
+): Promise<"shared" | "downloaded" | "failed"> {
   const blob = await renderShareCard(analysis);
   if (!blob) return "failed";
   const file = new File([blob], `dripcheck-${analysis.dripScore.toFixed(1)}.png`, {

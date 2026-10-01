@@ -16,9 +16,6 @@ import type { FitAnalysis } from "./live-types";
 
 export const RATING_GAME_CHECK_TYPE = "rating_game";
 
-/** Existing per-device cap on leaderboard entries, carried over unchanged. */
-const MAX_ENTRIES_PER_DEVICE_PER_HOUR = 5;
-
 export type LeaderboardEntry = {
   id: string;
   rank: number;
@@ -88,23 +85,10 @@ export async function playRatingGame(input: {
   deviceKey: string;
   tzOffset: number;
 }): Promise<RatingGameResult> {
-  // Checked before analysing, so a capped device doesn't spend an AI call on
-  // a result it can't post.
-  const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const { count: recent, error: capError } = await supabaseAdmin
-    .from("live_scores")
-    .select("id", { count: "exact", head: true })
-    .eq("check_type", RATING_GAME_CHECK_TYPE)
-    .eq("device_key", input.deviceKey)
-    .gte("created_at", hourAgo);
-
-  if (!capError && (recent ?? 0) >= MAX_ENTRIES_PER_DEVICE_PER_HOUR) {
-    return {
-      ok: false,
-      error: "This device already posted 5 fits this hour. Let someone else have a go.",
-    };
-  }
-
+  // No cap on how many players a device can enter: the Rating Game runs on a
+  // shared booth, so one device legitimately serves a whole queue. The only
+  // limit left is the short anti-spam gate below, which a real game (a ~7s
+  // scan plus analysis) can never reach.
   const gate = checkAnalysisRate(input.deviceKey);
   if (!gate.ok) return { ok: false, error: gate.message };
 
